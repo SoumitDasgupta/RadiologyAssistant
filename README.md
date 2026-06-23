@@ -27,7 +27,7 @@ An AI-powered radiology image analysis tool built with a modern dark medical UI.
 |-----------|-----------------------------------|
 | Frontend  | Vanilla HTML, CSS, JavaScript     |
 | Backend   | Python, FastAPI, Uvicorn          |
-| AI Model  | Google Gemini 2.5 Flash (Vision)  |
+| AI Model  | Google Gemini 2.5 Flash (Vision), Groq  |
 | Database  | SQLite (via Python sqlite3)       |
 | Image     | Pillow (PIL)                      |
 | Reports   | ReportLab                         |

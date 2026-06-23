@@ -433,29 +433,35 @@ async function sendChatMessage() {
   const typingId = appendChatTyping();
 
   try {
-    // Build context: include latest analysis if available
-    const summary  = document.getElementById("summaryText")?.textContent || "";
-    const findings = [...document.querySelectorAll(".finding-title")].map(el => el.textContent.trim()).join("; ");
-    const context  = summary
-      ? `\n\n[Current analysis context — Impression: ${summary} | Findings: ${findings}]`
-      : "";
+    // Grab Gemini analysis context from the UI
+    const impression     = document.getElementById("summaryText")?.textContent?.trim() || null;
+    const findings       = [...document.querySelectorAll(".finding-title")]
+                            .map(el => el.textContent.trim()).join("; ") || null;
+    const confidenceText = document.getElementById("confidencePct")?.textContent?.trim();
+    const confidence     = confidenceText ? parseInt(confidenceText) : null;
+    const recommendation = [...document.querySelectorAll("#recsList li")]
+                            .map(el => el.textContent.trim()).join("; ") || null;
 
-    // Flatten history for the API (last 10 turns to stay within limits)
-    const messages = chatHistory.slice(-10).map(m => ({ role: m.role, content: m.content }));
+    const analysisContext = (impression || findings)
+      ? { impression, findings, confidence, recommendation }
+      : null;
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(`${API}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1000,
-        system: "You are an expert AI Radiology Assistant. Answer questions about radiology, medical imaging, findings, and diagnostic imaging techniques clearly and accurately. Always remind users that AI analysis must be confirmed by a qualified radiologist for clinical decisions." + context,
-        messages,
+        messages: chatHistory.slice(-10).map(m => ({ role: m.role, content: m.content })),
+        analysis_context: analysisContext,
       }),
     });
 
-    const data = await res.json();
-    const reply = data.content?.find(b => b.type === "text")?.text || "Sorry, I couldn't generate a response.";
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Server error ${res.status}`);
+    }
+
+    const data  = await res.json();
+    const reply = data.reply || "Sorry, I couldn't generate a response.";
 
     removeTyping(typingId);
     appendChatMessage("assistant", reply);
@@ -463,7 +469,7 @@ async function sendChatMessage() {
 
   } catch (err) {
     removeTyping(typingId);
-    appendChatMessage("assistant", "⚠️ Error connecting to AI: " + err.message);
+    appendChatMessage("assistant", "⚠️ Error connecting to Groq AI: " + err.message);
   }
 }
 

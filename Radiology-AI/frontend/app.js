@@ -537,6 +537,9 @@ async function loadDashboard() {
       const [id, filename, findings, impression, confidence, recommendation] = row;
       const card = document.createElement("div");
       card.className = "dash-report-card";
+      card.setAttribute("role", "button");
+      card.setAttribute("tabindex", "0");
+      card.title = "Click to view full report";
       card.innerHTML = `
         <div class="dash-report-header">
           <span class="dash-report-name">📋 ${filename || "Unknown file"}</span>
@@ -544,7 +547,12 @@ async function loadDashboard() {
         </div>
         <div class="dash-report-impression">${impression || "No impression recorded."}</div>
         ${recommendation ? `<div class="dash-report-rec">💡 ${recommendation.slice(0, 120)}${recommendation.length > 120 ? "…" : ""}</div>` : ""}
-        <div class="dash-report-id">Report #${id}</div>`;
+        <div class="dash-report-footer-row">
+          <div class="dash-report-id">Report #${id}</div>
+          <span class="dash-view-link">View details →</span>
+        </div>`;
+      card.addEventListener("click", () => openReportModal(id));
+      card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") openReportModal(id); });
       listEl.appendChild(card);
     });
 
@@ -554,4 +562,119 @@ async function loadDashboard() {
     document.getElementById("statAvgConf").textContent = "—";
     document.getElementById("statLatest").textContent  = "—";
   }
+}
+
+/* ── Report Detail Modal ───────────────────────────────── */
+async function openReportModal(reportId) {
+  const modal = document.getElementById("reportModal");
+  modal.style.display = "flex";
+
+  // Show loading state
+  document.getElementById("modalFilename").textContent   = "Loading…";
+  document.getElementById("modalConfBadge").textContent  = "";
+  document.getElementById("modalImpression").textContent = "Fetching report…";
+  document.getElementById("modalFindings").innerHTML     = "";
+  document.getElementById("modalRecs").innerHTML         = "";
+  document.getElementById("modalReportId").textContent   = "Report #" + reportId;
+
+  try {
+    const res  = await fetch(`${API}/report/${reportId}`);
+    if (!res.ok) throw new Error("Status " + res.status);
+    const row  = await res.json();
+
+    if (row.error) throw new Error(row.error);
+
+    // row = [id, filename, findings, impression, confidence, recommendation]
+    const [id, filename, findings, impression, confidence, recommendation] = row;
+    const confNum   = confidence || 0;
+    const confClass = confNum >= 80 ? "teal" : confNum >= 60 ? "orange" : "red";
+
+    document.getElementById("modalFilename").textContent = filename || "Unknown file";
+
+    const badge = document.getElementById("modalConfBadge");
+    badge.textContent  = confNum + "% confidence";
+    badge.className    = "modal-conf-badge " + confClass;
+
+    // Impression
+    document.getElementById("modalImpression").textContent = impression || "No impression recorded.";
+
+    // Findings — try to split on newline/semicolon into a list
+    const findingsEl = document.getElementById("modalFindings");
+    if (findings) {
+      const items = findings.split(/\n|;/).map(s => s.trim()).filter(Boolean);
+      if (items.length > 1) {
+        findingsEl.innerHTML = items.map(f => `<div class="modal-finding-item"><span class="modal-finding-dot"></span>${f}</div>`).join("");
+      } else {
+        findingsEl.textContent = findings;
+      }
+    } else {
+      findingsEl.textContent = "No findings recorded.";
+    }
+
+    // Recommendations
+    const recsEl = document.getElementById("modalRecs");
+    if (recommendation) {
+      const items = recommendation.split(/\n|;|\.(?=\s)/).map(s => s.trim()).filter(Boolean);
+      if (items.length > 1) {
+        recsEl.innerHTML = "<ul>" + items.map(r => `<li>${r}</li>`).join("") + "</ul>";
+      } else {
+        recsEl.textContent = recommendation;
+      }
+    } else {
+      recsEl.textContent = "No recommendations recorded.";
+    }
+
+    // Export button
+    document.getElementById("modalExportBtn").onclick = () => exportModalReport({ id, filename, findings, impression, confidence: confNum, recommendation });
+
+  } catch (err) {
+    document.getElementById("modalImpression").textContent = "⚠️ Could not load report: " + err.message;
+  }
+}
+
+function closeReportModal(event) {
+  // Close if clicking overlay background or close button (no event = button click)
+  if (event && event.target !== document.getElementById("reportModal")) return;
+  document.getElementById("reportModal").style.display = "none";
+}
+
+// Also close on Escape key
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") document.getElementById("reportModal").style.display = "none";
+});
+
+function exportModalReport({ id, filename, findings, impression, confidence, recommendation }) {
+  const report = [
+    "═══════════════════════════════════════",
+    "       AI RADIOLOGY REPORT",
+    "═══════════════════════════════════════",
+    "Report ID:  #" + id,
+    "File:       " + (filename || "Unknown"),
+    "Generated:  " + new Date().toLocaleString(),
+    "AI Model:   Gemini 2.5 Flash",
+    "Confidence: " + confidence + "%",
+    "",
+    "CLINICAL IMPRESSION",
+    "───────────────────",
+    impression || "None.",
+    "",
+    "FINDINGS",
+    "────────",
+    findings || "None.",
+    "",
+    "RECOMMENDATIONS",
+    "───────────────",
+    recommendation || "None.",
+    "",
+    "═══════════════════════════════════════",
+    "⚠  This report is AI-generated and must",
+    "   be reviewed by a qualified radiologist.",
+    "═══════════════════════════════════════",
+  ].join("\n");
+
+  const blob = new Blob([report], { type: "text/plain" });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement("a"), { href: url, download: `report_${id}_${filename || "export"}.txt` });
+  a.click();
+  URL.revokeObjectURL(url);
 }

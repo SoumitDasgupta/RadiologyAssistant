@@ -120,6 +120,8 @@
     </div>
   </header>
 
+  <!-- Tab panels -->
+  <div id="viewerTab" class="tab-panel active">
   <div class="app-body">
 
     <!-- LEFT SIDEBAR -->
@@ -281,8 +283,56 @@
       </div>
     </aside>
 
+  </div><!-- end app-body -->
+  </div><!-- end viewerTab -->
+
+  <!-- CHAT TAB -->
+  <div id="chatTab" class="tab-panel" style="display:none;">
+    <div class="chat-container">
+      <div class="chat-messages" id="chatMessages">
+        <div class="chat-welcome">
+          <div class="chat-welcome-icon">💬</div>
+          <div class="chat-welcome-title">AI Radiology Chat</div>
+          <div class="chat-welcome-sub">Ask questions about radiology findings, techniques, or upload an image for AI-assisted analysis.</div>
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <div class="chat-input-wrap">
+          <textarea id="chatInput" class="chat-textarea" placeholder="Ask about radiology findings, imaging techniques, or anything medical imaging related…" rows="1" onkeydown="chatKeydown(event)"></textarea>
+          <button class="chat-send-btn" onclick="sendChatMessage()">➔ Send</button>
+        </div>
+        <div class="chat-hint">Press Enter to send · Shift+Enter for new line · Powered by Claude AI</div>
+      </div>
+    </div>
   </div>
-</div>
+
+  <!-- DASHBOARD TAB -->
+  <div id="dashboardTab" class="tab-panel" style="display:none;">
+    <div class="dashboard-container">
+      <div class="dashboard-header">
+        <div class="dashboard-title">Analysis Dashboard</div>
+        <button class="dash-refresh-btn" onclick="loadDashboard()">↺ Refresh</button>
+      </div>
+      <div class="dash-stats-row" id="dashStats">
+        <div class="dash-stat-card">
+          <div class="dash-stat-num teal" id="statTotal">—</div>
+          <div class="dash-stat-label">Total Analyses</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-num orange" id="statAvgConf">—</div>
+          <div class="dash-stat-label">Avg Confidence</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-num purple" id="statLatest">—</div>
+          <div class="dash-stat-label">Latest Analysis</div>
+        </div>
+      </div>
+      <div class="dash-section-label">RECENT REPORTS</div>
+      <div id="dashReportsList" class="dash-reports-list">
+        <div class="dash-empty">No analyses yet. Load an image and click Analyze to get started.</div>
+      </div>
+    </div>
+  </div>
 
 <script src="app.js"></script>
 </body>

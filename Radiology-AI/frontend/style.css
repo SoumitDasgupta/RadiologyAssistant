@@ -448,3 +448,118 @@ a:hover { text-decoration: underline; }
   text-align: center; color: var(--muted); font-size: 13px;
   padding: 48px 20px; line-height: 1.7;
 }
+
+/* ══════════════════════════════════════════
+   DASHBOARD CARD — clickable state
+══════════════════════════════════════════ */
+.dash-report-card {
+  cursor: pointer;
+  transition: border-color .18s, transform .15s, box-shadow .18s;
+}
+.dash-report-card:hover {
+  border-color: var(--teal);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 18px rgba(13,232,192,.10);
+}
+.dash-report-footer-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 6px;
+}
+.dash-view-link {
+  font-size: 11px; color: var(--teal); font-weight: 600;
+  opacity: 0; transition: opacity .18s;
+}
+.dash-report-card:hover .dash-view-link { opacity: 1; }
+
+/* ══════════════════════════════════════════
+   REPORT DETAIL MODAL
+══════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.65); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+
+.modal-box {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 16px; width: 100%; max-width: 580px;
+  max-height: 85vh; display: flex; flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  animation: modalIn .18s ease;
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.modal-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 20px 20px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.modal-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.modal-filename { font-size: 15px; font-weight: 700; color: var(--text); word-break: break-all; }
+.modal-conf-badge {
+  font-size: 12px; font-weight: 700; padding: 3px 10px;
+  border-radius: 20px; border: 1px solid; white-space: nowrap;
+}
+.modal-conf-badge.teal   { color: var(--teal);   border-color: var(--teal);   background: rgba(13,232,192,.08); }
+.modal-conf-badge.orange { color: var(--orange); border-color: var(--orange); background: rgba(249,115,22,.08); }
+.modal-conf-badge.red    { color: var(--red);    border-color: var(--red);    background: rgba(239,68,68,.08); }
+
+.modal-close-btn {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 7px; width: 30px; height: 30px;
+  color: var(--subtle); font-size: 13px; cursor: pointer;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  transition: background .15s, color .15s;
+}
+.modal-close-btn:hover { background: var(--bg4); color: var(--text); }
+
+.modal-body {
+  flex: 1; overflow-y: auto; padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.modal-body::-webkit-scrollbar { width: 4px; }
+.modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.modal-section { display: flex; flex-direction: column; gap: 8px; }
+.modal-section-label {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  letter-spacing: .1em; text-transform: uppercase;
+}
+
+.modal-impression {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 14px;
+  font-size: 13px; color: var(--subtle); line-height: 1.65;
+}
+
+.modal-finding-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 12px; background: var(--bg3);
+  border: 1px solid var(--border); border-radius: 8px;
+  font-size: 12px; color: var(--text); line-height: 1.5;
+  margin-bottom: 5px;
+}
+.modal-finding-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--teal); flex-shrink: 0; margin-top: 4px;
+}
+.modal-findings { font-size: 13px; color: var(--subtle); line-height: 1.65; }
+
+.modal-recs { font-size: 13px; color: var(--subtle); line-height: 1.65; }
+.modal-recs ul { padding-left: 18px; }
+.modal-recs li { margin-bottom: 5px; }
+
+.modal-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.modal-report-id { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .06em; }
+.modal-export-btn {
+  padding: 8px 16px; background: var(--orange); color: #fff;
+  font-weight: 600; font-size: 12px; border: none; border-radius: 8px;
+  cursor: pointer; transition: opacity .2s;
+}
+.modal-export-btn:hover { opacity: .85; }

@@ -9,6 +9,7 @@ let selectedFile = null;
 let zoom = 100;
 let currentTool = "select";
 let inverted = false;
+let currentPresetFilter = "";   // tracks the active preset's filter string
 
 /* ── Login ──────────────────────────────────────────────── */
 function setRole(btn, role) {
@@ -97,8 +98,11 @@ function applyFilters() {
   document.getElementById("contrastVal").textContent   = c;
   document.getElementById("sharpnessVal").textContent  = s;
   const preview = document.getElementById("preview");
-  if (preview)
-    preview.style.filter = `brightness(${1 + b/100}) contrast(${1 + c/100}) ${s > 0 ? `saturate(${1 + s*0.01})` : ""}`;
+  if (preview) {
+    // Build slider filter on top of the active preset filter
+    const sliderPart = `brightness(${1 + b/100}) contrast(${1 + c/100}) ${s > 0 ? `saturate(${1 + s*0.01})` : ""}`;
+    preview.style.filter = (currentPresetFilter ? currentPresetFilter + " " : "") + sliderPart;
+  }
 }
 
 function resetSliders() {
@@ -107,8 +111,9 @@ function resetSliders() {
     const el = document.getElementById(id + "Val");
     if (el) el.textContent = "0";
   });
+  // Restore to current preset (don't clear the preset)
   const preview = document.getElementById("preview");
-  if (preview) preview.style.filter = "";
+  if (preview) preview.style.filter = currentPresetFilter;
   inverted = false;
 }
 
@@ -125,16 +130,39 @@ const PRESETS = {
 function setPreset(btn, name) {
   document.querySelectorAll(".preset").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
+
+  // Store the preset filter separately so sliders can layer on top
+  currentPresetFilter = PRESETS[name] || "";
+
   const preview = document.getElementById("preview");
-  if (preview) preview.style.filter = PRESETS[name] || "";
+  if (preview) preview.style.filter = currentPresetFilter;
+
   document.getElementById("presetInfo").textContent = "PRESET — " + btn.textContent;
-  resetSliders();
+
+  // Reset sliders to 0 without wiping the preset
+  ["brightness","contrast","sharpness"].forEach(id => {
+    document.getElementById(id).value = 0;
+    const el = document.getElementById(id + "Val");
+    if (el) el.textContent = "0";
+  });
+  inverted = false;
 }
 
 /* ── Tabs ──────────────────────────────────────────────── */
 function setTab(btn, tab) {
+  // Toggle active button
   document.querySelectorAll(".vtab").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
+
+  // Show the matching panel, hide the others
+  const panels = { viewer: "viewerTab", chat: "chatTab", dashboard: "dashboardTab" };
+  Object.entries(panels).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = key === tab ? (key === "viewer" ? "block" : "flex") : "none";
+  });
+
+  // When switching to dashboard, load latest data
+  if (tab === "dashboard") loadDashboard();
 }
 
 /* ── Tools ─────────────────────────────────────────────── */
@@ -159,6 +187,7 @@ function applyZoom(z) {
 
 /* ── Nav actions ───────────────────────────────────────── */
 function resetView() {
+  currentPresetFilter = "";
   resetSliders();
   applyZoom(100);
   clearAnnotations();
@@ -240,23 +269,19 @@ async function analyzeImage() {
 function renderAnalysis(a) {
   if (!a) return;
 
-  // Hide empty state
   document.getElementById("emptyState").style.display = "none";
 
-  // Confidence
   const pct = typeof a.confidence === "number" ? a.confidence : parseInt(a.confidence) || 85;
   document.getElementById("confidenceBlock").style.display = "block";
   document.getElementById("confidencePct").textContent  = pct + "%";
   document.getElementById("confidenceBar").style.width  = pct + "%";
 
-  // Summary / impression
   const summary = a.impression || a.summary || "";
   if (summary) {
     document.getElementById("summarySection").style.display = "block";
     document.getElementById("summaryText").textContent = summary;
   }
 
-  // Findings
   const findings = a.findings_list || parseFindingsText(a.findings);
   if (findings && findings.length) {
     document.getElementById("findingsSection").style.display = "block";
@@ -278,7 +303,6 @@ function renderAnalysis(a) {
     placeAnnotation(findings[0]?.title || String(findings[0]));
   }
 
-  // Recommendations
   const recs = a.recommendations_list || parseRecsText(a.recommendation);
   if (recs && recs.length) {
     document.getElementById("recsSection").style.display = "block";
@@ -381,4 +405,153 @@ function askAI() {
   const q = prompt("Ask about the findings:");
   if (!q) return;
   alert("Based on the analysis:\n\n" + summary + "\n\nYour question: " + q + "\n\nPlease consult a qualified radiologist for clinical decisions.");
+}
+
+/* ══════════════════════════════════════════════════════════
+   CHAT TAB
+══════════════════════════════════════════════════════════ */
+const chatHistory = [];   // { role: "user"|"assistant", content: string }
+
+function chatKeydown(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
+  }
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById("chatInput");
+  const text  = input.value.trim();
+  if (!text) return;
+
+  input.value = "";
+  input.style.height = "auto";
+
+  appendChatMessage("user", text);
+  chatHistory.push({ role: "user", content: text });
+
+  const typingId = appendChatTyping();
+
+  try {
+    // Build context: include latest analysis if available
+    const summary  = document.getElementById("summaryText")?.textContent || "";
+    const findings = [...document.querySelectorAll(".finding-title")].map(el => el.textContent.trim()).join("; ");
+    const context  = summary
+      ? `\n\n[Current analysis context — Impression: ${summary} | Findings: ${findings}]`
+      : "";
+
+    // Flatten history for the API (last 10 turns to stay within limits)
+    const messages = chatHistory.slice(-10).map(m => ({ role: m.role, content: m.content }));
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        system: "You are an expert AI Radiology Assistant. Answer questions about radiology, medical imaging, findings, and diagnostic imaging techniques clearly and accurately. Always remind users that AI analysis must be confirmed by a qualified radiologist for clinical decisions." + context,
+        messages,
+      }),
+    });
+
+    const data = await res.json();
+    const reply = data.content?.find(b => b.type === "text")?.text || "Sorry, I couldn't generate a response.";
+
+    removeTyping(typingId);
+    appendChatMessage("assistant", reply);
+    chatHistory.push({ role: "assistant", content: reply });
+
+  } catch (err) {
+    removeTyping(typingId);
+    appendChatMessage("assistant", "⚠️ Error connecting to AI: " + err.message);
+  }
+}
+
+function appendChatMessage(role, content) {
+  const messages = document.getElementById("chatMessages");
+  const div = document.createElement("div");
+  div.className = "chat-msg chat-msg-" + role;
+
+  // Convert newlines to paragraphs for assistant messages
+  const formatted = role === "assistant"
+    ? content.split(/\n{2,}/).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("")
+    : `<p>${content.replace(/\n/g, "<br>")}</p>`;
+
+  div.innerHTML = `
+    <div class="chat-bubble">
+      <div class="chat-bubble-role">${role === "user" ? "You" : "✦ AI Assistant"}</div>
+      <div class="chat-bubble-content">${formatted}</div>
+    </div>`;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  return div;
+}
+
+let typingCounter = 0;
+function appendChatTyping() {
+  const id = "typing-" + (++typingCounter);
+  const messages = document.getElementById("chatMessages");
+  const div = document.createElement("div");
+  div.id = id;
+  div.className = "chat-msg chat-msg-assistant";
+  div.innerHTML = `<div class="chat-bubble"><div class="chat-bubble-role">✦ AI Assistant</div><div class="chat-typing"><span></span><span></span><span></span></div></div>`;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  return id;
+}
+
+function removeTyping(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+/* ══════════════════════════════════════════════════════════
+   DASHBOARD TAB
+══════════════════════════════════════════════════════════ */
+async function loadDashboard() {
+  const listEl = document.getElementById("dashReportsList");
+  listEl.innerHTML = '<div class="dash-empty">Loading…</div>';
+
+  try {
+    const res  = await fetch(`${API}/history`);
+    if (!res.ok) throw new Error("Backend unreachable (status " + res.status + ")");
+    const rows = await res.json();
+
+    if (!rows || rows.length === 0) {
+      listEl.innerHTML = '<div class="dash-empty">No analyses yet. Load an image and click Analyze to get started.</div>';
+      document.getElementById("statTotal").textContent    = "0";
+      document.getElementById("statAvgConf").textContent  = "—";
+      document.getElementById("statLatest").textContent   = "—";
+      return;
+    }
+
+    // Stats
+    document.getElementById("statTotal").textContent = rows.length;
+    const avgConf = Math.round(rows.reduce((s, r) => s + (r[4] || 0), 0) / rows.length);
+    document.getElementById("statAvgConf").textContent = avgConf + "%";
+    document.getElementById("statLatest").textContent  = rows[0][1] || "—";
+
+    // Reports list — rows: [id, filename, findings, impression, confidence, recommendation]
+    listEl.innerHTML = "";
+    rows.forEach(row => {
+      const [id, filename, findings, impression, confidence, recommendation] = row;
+      const card = document.createElement("div");
+      card.className = "dash-report-card";
+      card.innerHTML = `
+        <div class="dash-report-header">
+          <span class="dash-report-name">📋 ${filename || "Unknown file"}</span>
+          <span class="dash-report-conf ${confidence >= 80 ? "teal" : confidence >= 60 ? "orange" : "red"}">${confidence || 0}%</span>
+        </div>
+        <div class="dash-report-impression">${impression || "No impression recorded."}</div>
+        ${recommendation ? `<div class="dash-report-rec">💡 ${recommendation.slice(0, 120)}${recommendation.length > 120 ? "…" : ""}</div>` : ""}
+        <div class="dash-report-id">Report #${id}</div>`;
+      listEl.appendChild(card);
+    });
+
+  } catch (err) {
+    listEl.innerHTML = `<div class="dash-empty">⚠️ Could not load history: ${err.message}<br><small>Make sure the backend is running at ${API}</small></div>`;
+    document.getElementById("statTotal").textContent   = "—";
+    document.getElementById("statAvgConf").textContent = "—";
+    document.getElementById("statLatest").textContent  = "—";
+  }
 }

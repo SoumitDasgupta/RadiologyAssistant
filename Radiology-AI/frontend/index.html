@@ -334,6 +334,41 @@
     </div>
   </div>
 
+<!-- REPORT DETAIL MODAL -->
+<div id="reportModal" class="modal-overlay" style="display:none;" onclick="closeReportModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title-row">
+        <span class="modal-filename" id="modalFilename">—</span>
+        <span class="modal-conf-badge" id="modalConfBadge">—</span>
+      </div>
+      <button class="modal-close-btn" onclick="closeReportModal()">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-section-label">CLINICAL IMPRESSION</div>
+        <div class="modal-impression" id="modalImpression">—</div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-section-label">FINDINGS</div>
+        <div class="modal-findings" id="modalFindings">—</div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-section-label">RECOMMENDATIONS</div>
+        <div class="modal-recs" id="modalRecs">—</div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <span class="modal-report-id" id="modalReportId"></span>
+      <button class="modal-export-btn" id="modalExportBtn">↓ Export Report</button>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 </body>
 </html>
